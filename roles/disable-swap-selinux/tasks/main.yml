@@ -7,8 +7,3 @@
     path: /etc/fstab
     regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
     replace: '# \1'
-
-- name: Set SELinux to permissive mode
-  ansible.posix.selinux:
-    state: permissive
-    policy: targeted

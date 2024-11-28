@@ -1,5 +1,10 @@
+- name: Update apt-get repo and cache
+  apt:
+    force_apt_get: yes
+    update_cache: yes
+
 - name: Install prereq packages
-  yum:
+  apt:
     name: "{{ packages }}"
     state: present
   vars:
@@ -7,6 +12,7 @@
       - git
       - make
       - gcc
+      - jq
 
 - name: Create a shell script
   copy:
@@ -15,7 +21,7 @@
       set -o errexit
 
       echo 'This is a script to run k8s UT tests'
-      useradd nonroot
+      useradd -s /bin/bash -d /home/nonroot -m nonroot
       su - nonroot <<EOF
       set -o errexit
 

@@ -1,15 +1,14 @@
 ---
 - name: Install containerd dependencies
-  yum:
+  apt:
     name:
-      - device-mapper-persistent-data
       - lvm2
     state: present
-    disable_gpg_check: true
+    allow_unauthenticated: true
 
 - name: Download and set up containerd - {{ containerd_version }}
   unarchive:
-    src: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-ppc64le.tar.gz"
+    src: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-s390x.tar.gz"
     dest: "/usr/local"
     remote_src: yes
   retries: 3
