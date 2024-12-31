@@ -1,6 +1,6 @@
 - name: Download flannel manifest
   get_url:
-    url: "https://raw.githubusercontent.com/flannel-io/flannel/v0.26.1/Documentation/kube-flannel.yml"
+    url: "https://raw.githubusercontent.com/flannel-io/flannel/{{ flannel_version }}/Documentation/kube-flannel.yml"
     dest: /tmp/kube-flannel.yml
     mode: '0755'
 
