@@ -31,11 +31,8 @@
 
       echo 'This is a script to run k8s UT tests'
 
-      if [[ $(uname -m) == "s390x" ]]; then
-        useradd -s /bin/bash -d /home/nonroot -m nonroot
-      else
-        useradd nonroot
-      fi
+      useradd -s /bin/bash -d /home/nonroot -m nonroot
+
       su - nonroot <<EOF
       set -o errexit
 
