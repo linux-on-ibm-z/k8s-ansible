@@ -16,7 +16,6 @@
 - name: Remove domainname from the hostname
   shell: |
     hostnamectl set-hostname $(hostname | cut -d "." -f1)
-  when: ansible_architecture == 'ppc64le'
 
 - name: Install prereq packages
   yum:

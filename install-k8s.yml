@@ -6,8 +6,6 @@
     - runtime
     - download-k8s
     - install-k8s
-    - role: install-cni-plugins
-      when: cni_provider == "flannel"
 
 - name: Install networking - calico
   hosts: masters

@@ -1,10 +1,18 @@
+- name: Install CNI plugins on all nodes
+  include_tasks: install-cni-plugins.yml
+  run_once: false
+  delegate_to: "{{ item }}"
+  with_items: "{{ groups['masters'] + groups['workers'] }}"
+
 - name: Download flannel manifest
   get_url:
     url: "https://raw.githubusercontent.com/flannel-io/flannel/{{ flannel_version }}/Documentation/kube-flannel.yml"
     dest: /tmp/kube-flannel.yml
     mode: '0755'
+  when: inventory_hostname in groups['masters']
 
 - name: Set up Flannel CNI from manifest
   command: kubectl create -f /tmp/kube-flannel.yml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname in groups['masters']
