@@ -1,8 +1,5 @@
 - name: Install CNI plugins on all nodes
   include_tasks: install-cni-plugins.yml
-  run_once: false
-  delegate_to: "{{ item }}"
-  with_items: "{{ groups['masters'] + groups['workers'] }}"
 
 - name: Download flannel manifest
   get_url:

@@ -2,6 +2,10 @@
   file:
     path: /opt/cni/bin
     state: directory
+  delegate_to: "{{ item }}"
+  with_items:
+    - "{{ groups['masters'] }}"
+    - "{{ groups['workers'] }}"
 
 - name: Download and setup cni plugins
   unarchive:
@@ -12,3 +16,7 @@
       - --strip-components=1
   retries: 3
   delay: 5
+  delegate_to: "{{ item }}"
+  with_items:
+    - "{{ groups['masters'] }}"
+    - "{{ groups['workers'] }}"
