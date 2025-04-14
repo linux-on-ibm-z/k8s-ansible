@@ -14,7 +14,7 @@
     packages:
       - iptables
       - network-manager
-  when: ansible_pkg_mgr == 'apt'
+  when: node_type == "bastion" and ansible_pkg_mgr == 'apt'
 
 - name: Configure networks on bastion
   shell: |
