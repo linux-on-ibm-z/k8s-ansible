@@ -57,7 +57,7 @@
     enabled: yes
   when: node_type == "bastion"
 
-- name: Add renderer: NetworkManager to netplan config if not present
+- name: Add renderer as NetworkManager to netplan config if not present
   lineinfile:
     path: /etc/netplan/50-cloud-init.yaml
     insertafter: '^version:'
