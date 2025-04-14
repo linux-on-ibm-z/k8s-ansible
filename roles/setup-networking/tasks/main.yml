@@ -57,18 +57,18 @@
     enabled: yes
   when: node_type == "bastion"
 
-- name: Add renderer as NetworkManager to netplan config if not present
-  lineinfile:
-    path: /etc/netplan/50-cloud-init.yaml
-    insertafter: '^version:'
-    line: '  renderer: NetworkManager'
-  when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
+# - name: Add renderer as NetworkManager to netplan config if not present
+#   lineinfile:
+#     path: /etc/netplan/50-cloud-init.yaml
+#     insertafter: '^version:'
+#     line: '  renderer: NetworkManager'
+#   when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
 
-- name: Apply netplan configuration
-  shell: |
-    netplan apply
-    systemctl restart NetworkManager
-  when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
+# - name: Apply netplan configuration
+#   shell: |
+#     netplan apply
+#     systemctl restart NetworkManager
+#   when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
 
 - name: Identify interfaces on the masters and workers associated with private IP
   shell: bash -c '
