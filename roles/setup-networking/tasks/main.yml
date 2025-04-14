@@ -4,17 +4,17 @@
     state: present
   when: node_type == "bastion" and ansible_pkg_mgr in ['yum', 'dnf']
 
-- name: Update apt-get repo/cache and install prereq packages
-  apt:
-    force_apt_get: yes
-    update_cache: yes
-    name: "{{ packages }}"
-    state: present
-  vars:
-    packages:
-      - iptables
-      - network-manager
-  when: node_type == "bastion" or node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
+# - name: Update apt-get repo/cache and install prereq packages
+#   apt:
+#     force_apt_get: yes
+#     update_cache: yes
+#     name: "{{ packages }}"
+#     state: present
+#   vars:
+#     packages:
+#       - iptables
+#       - network-manager
+#   when: node_type == "bastion" or node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
 
 - name: Configure networks on bastion
   shell: |
