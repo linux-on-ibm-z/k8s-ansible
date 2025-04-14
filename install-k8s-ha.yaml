@@ -1,10 +1,10 @@
-- name: Setup Networking on the control-plane, compute and bastion nodes.
-  hosts:
-    - masters
-    - workers
-    - bastion
-  roles:
-    - setup-networking
+# - name: Setup Networking on the control-plane, compute and bastion nodes.
+#   hosts:
+#     - masters
+#     - workers
+#     - bastion
+#   roles:
+#     - setup-networking
 
 - name: Install Runtime and Kubernetes
   hosts:
