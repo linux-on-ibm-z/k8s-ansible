@@ -14,14 +14,16 @@
     packages:
       - iptables
       - network-manager
-  when: node_type == "bastion" and ansible_pkg_mgr == 'apt'
+  when: node_type == "bastion" or node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
 
 - name: Configure networks on bastion
   shell: |
-    dev_uuid=$(grep $(ip a | grep {{ bastion_private_ip }} | awk '{ print $NF }') <(nmcli -g device,uuid con) | cut -d':' -f2)
-    nmcli connection modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
-    nmcli connection modify $dev_uuid -ipv4.gateway ""
-    nmcli connection up $dev_uuid
+    bash -c '
+      dev_uuid=$(grep $(ip a | grep {{ bastion_private_ip }} | awk "{ print \$NF }") <(nmcli -g device,uuid con) | cut -d":" -f2)
+      nmcli connection modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
+      nmcli connection modify $dev_uuid -ipv4.gateway ""
+      nmcli connection up $dev_uuid
+    '
   when: node_type == "bastion"
 
 - name: Copy the ip-forwarder.sh script
@@ -55,12 +57,26 @@
     enabled: yes
   when: node_type == "bastion"
 
-- name: Identify interfaces on the masters and workers associated with private IP
+- name: Add renderer: NetworkManager to netplan config if not present
+  lineinfile:
+    path: /etc/netplan/50-cloud-init.yaml
+    insertafter: '^version:'
+    line: '  renderer: NetworkManager'
+  when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
+
+- name: Apply netplan configuration
   shell: |
-    dev_uuid=$(grep $(ip a | grep {{ ansible_default_ipv4.address }} | awk '{ print $NF }') <(nmcli -g device,uuid con) | cut -d':' -f2)
-    nmcli conn modify $dev_uuid ipv4.gateway {{ bastion_private_ip }}
-    nmcli conn modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
-    nmcli conn up $dev_uuid
+    netplan apply
+    systemctl restart NetworkManager
+  when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
+
+- name: Identify interfaces on the masters and workers associated with private IP
+  shell: bash -c '
+      dev_uuid=$(grep $(ip a | grep {{ ansible_default_ipv4.address }} | awk "{ print \$NF }") <(nmcli -g device,uuid con) | cut -d":" -f2)
+      nmcli conn modify $dev_uuid ipv4.gateway {{ bastion_private_ip }}
+      nmcli conn modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
+      nmcli conn up $dev_uuid
+    '
   when: node_type == "master" or node_type == "worker"
 
 - name: Ping a Public DNS to confirm internet connectivity
