@@ -4,18 +4,6 @@
     state: present
   when: node_type == "bastion" and ansible_pkg_mgr in ['yum', 'dnf']
 
-# - name: Update apt-get repo/cache and install prereq packages
-#   apt:
-#     force_apt_get: yes
-#     update_cache: yes
-#     name: "{{ packages }}"
-#     state: present
-#   vars:
-#     packages:
-#       - iptables
-#       - network-manager
-#   when: node_type == "bastion" or node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
-
 - name: Configure networks on bastion
   shell: |
     bash -c '
@@ -56,19 +44,6 @@
     state: started
     enabled: yes
   when: node_type == "bastion"
-
-# - name: Add renderer as NetworkManager to netplan config if not present
-#   lineinfile:
-#     path: /etc/netplan/50-cloud-init.yaml
-#     insertafter: '^version:'
-#     line: '  renderer: NetworkManager'
-#   when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
-
-# - name: Apply netplan configuration
-#   shell: |
-#     netplan apply
-#     systemctl restart NetworkManager
-#   when: node_type == "master" or node_type == "worker"and ansible_pkg_mgr == 'apt'
 
 - name: Identify interfaces on the masters and workers associated with private IP
   shell: |
