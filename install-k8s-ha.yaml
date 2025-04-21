@@ -4,8 +4,8 @@
     - workers
     - bastion
   roles:
-    - setup-networking
-  when: cni_provider != "flannel"
+    - role: setup-networking
+      when: cni_provider != "flannel"
 
 - name: Install Runtime and Kubernetes
   hosts:
