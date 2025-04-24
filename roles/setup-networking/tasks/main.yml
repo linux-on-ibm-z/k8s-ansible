@@ -6,12 +6,10 @@
 
 - name: Configure networks on bastion
   shell: |
-    bash -c '
-      dev_uuid=$(grep $(ip a | grep {{ bastion_private_ip }} | awk "{ print \$NF }") <(nmcli -g device,uuid con) | cut -d":" -f2)
-      nmcli connection modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
-      nmcli connection modify $dev_uuid -ipv4.gateway ""
-      nmcli connection up $dev_uuid
-    '
+    dev_uuid=$(grep $(ip a | grep {{ bastion_private_ip }} | awk '{ print $NF }') <(nmcli -g device,uuid con) | cut -d':' -f2)
+    nmcli connection modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
+    nmcli connection modify $dev_uuid -ipv4.gateway ""
+    nmcli connection up $dev_uuid
   when: node_type == "bastion"
 
 - name: Copy the ip-forwarder.sh script
@@ -47,14 +45,13 @@
 
 - name: Identify interfaces on the masters and workers associated with private IP
   shell: |
-    bash -c '
-      dev_uuid=$(grep $(ip a | grep {{ ansible_default_ipv4.address }} | awk "{ print \$NF }") <(nmcli -g device,uuid con) | cut -d":" -f2)
-      nmcli conn modify $dev_uuid ipv4.gateway {{ bastion_private_ip }}
-      nmcli conn modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
-      nmcli conn up $dev_uuid
-    '
+    dev_uuid=$(grep $(ip a | grep {{ ansible_default_ipv4.address }} | awk '{ print $NF }') <(nmcli -g device,uuid con) | cut -d':' -f2)
+    nmcli conn modify $dev_uuid ipv4.gateway {{ bastion_private_ip }}
+    nmcli conn modify $dev_uuid +ipv4.routes "{{ vpc_cidr }} {{ bastion_private_gateway }}"
+    nmcli conn up $dev_uuid
   when: node_type == "master" or node_type == "worker"
 
 - name: Ping a Public DNS to confirm internet connectivity
   shell: ping -c 2 -w 2 8.8.8.8
   when: node_type == "master" or node_type == "worker"
+  
