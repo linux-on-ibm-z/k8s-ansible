@@ -114,7 +114,7 @@
 
 - name: Copy admin.conf with debug
   ansible.builtin.copy:
-    src: kubeconfig
+    src: /etc/kubernetes/admin.conf
     dest: /etc/kubernetes/admin.conf
     owner: root
     group: root
