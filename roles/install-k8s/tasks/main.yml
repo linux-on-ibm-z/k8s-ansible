@@ -112,17 +112,24 @@
 #     flat: yes
 #   when: node_type == "master"
 
-- name: Copy admin.conf with debug
-  ansible.builtin.copy:
-    src: /etc/kubernetes/admin.conf
-    dest: /etc/kubernetes/admin.conf
-    owner: root
-    group: root
-    mode: '0600'
-    force: yes
-  diff: true
-  when: node_type == "master"
+# - name: Copy admin.conf with debug
+#   ansible.builtin.copy:
+#     src: /etc/kubernetes/admin.conf
+#     dest: /etc/kubernetes/admin.conf
+#     owner: root
+#     group: root
+#     mode: '0600'
+#     force: yes
+#   diff: true
+#   when: node_type == "master"
 
+- name: Reset kubeadm on all nodes
+  become: yes
+  ansible.builtin.shell: |
+    kubeadm reset -f
+    rm -rf ~/.kube
+    rm -rf /etc/cni/net.d/*
+  
 # - name: remove taint
 #   command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane-; kubectl taint nodes --all node-role.kubernetes.io/master-"
 #   environment:
