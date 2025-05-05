@@ -127,6 +127,8 @@
   become: yes
   ansible.builtin.shell: |
     kubeadm reset -f
+    rm -rf /etc/kubernetes/admin.conf
+    rm -rf /root/.kube/config
     rm -rf ~/.kube
     rm -rf /etc/cni/net.d/*
   
