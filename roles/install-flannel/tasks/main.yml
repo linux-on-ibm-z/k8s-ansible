@@ -18,10 +18,10 @@
     url: "https://raw.githubusercontent.com/flannel-io/flannel/{{ flannel_version }}/Documentation/kube-flannel.yml"
     dest: /tmp/kube-flannel.yml
     mode: '0755'
-  when: inventory_hostname in groups['masters']
+  when: inventory_hostname == groups['masters'][0]
 
 - name: Set up Flannel CNI from manifest
   command: kubectl create -f /tmp/kube-flannel.yml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
-  when: inventory_hostname in groups['masters']
+  when: inventory_hostname == groups['masters'][0]
