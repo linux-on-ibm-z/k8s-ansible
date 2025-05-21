@@ -1,11 +1,11 @@
-# - name: Setup Networking on the control-plane, compute and bastion nodes.
-#   hosts:
-#     - masters
-#     - workers
-#     - bastion
-#   roles:
-#     - role: setup-networking
-#       when: cni_provider != "flannel"
+- name: Setup Networking on the control-plane, compute and bastion nodes.
+  hosts:
+    - masters
+    - workers
+    - bastion
+  roles:
+    - role: setup-networking
+      when: cni_provider != "flannel"
 
 - name: Install Runtime and Kubernetes
   hosts:
@@ -16,11 +16,11 @@
     - download-k8s
     - install-k8s
 
-# - name: Install networking - calico
-#   hosts: masters
-#   roles:
-#     - role: install-calico
-#       when: cni_provider == "calico"
+- name: Install networking - calico
+  hosts: masters
+  roles:
+    - role: install-calico
+      when: cni_provider == "calico"
 
 - name: Install networking - flannel
   hosts:
