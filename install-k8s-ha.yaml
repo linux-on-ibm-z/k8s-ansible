@@ -12,8 +12,8 @@
     - masters
     - workers
   roles:
-    # - runtime
-    # - download-k8s
+    - runtime
+    - download-k8s
     - install-k8s
 
 - name: Install networking - calico
