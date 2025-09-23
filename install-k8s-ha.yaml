@@ -12,8 +12,8 @@
     - masters
     - workers
   roles:
-    - runtime
-    - download-k8s
+    #- runtime
+    #- download-k8s
     - install-k8s
 
 - name: Install networking - calico
@@ -22,10 +22,10 @@
     - role: install-calico
       when: cni_provider == "calico"
 
-- name: Install networking - flannel
-  hosts:
-    - masters
-    - workers
-  roles:
-    - role: install-flannel
-      when: cni_provider == "flannel"
+# - name: Install networking - flannel
+#   hosts:
+#     - masters
+#     - workers
+#   roles:
+#     - role: install-flannel
+#       when: cni_provider == "flannel"
