@@ -120,12 +120,14 @@
 - name: Reset kubeadm on all nodes
   become: yes
   ansible.builtin.shell: |
-    sudo lsof -i :10250
-    sudo kill -9 <PID>
-    sudo kubeadm reset -f
-    sudo systemctl stop kubelet
-    sudo systemctl disable kubelet
-    sudo rm -rf /etc/kubernetes/admin.conf /var/lib/kubelet /var/lib/etcd /etc/cni/net.d /var/lib/cni
+    pid=$(lsof -ti:10250) 
+    if [ -n "$pid" ]; then 
+      kill -9 $pid
+    fi
+    kubeadm reset -f
+    systemctl stop kubelet
+    systemctl disable kubelet
+    rm -rf /etc/kubernetes/admin.conf /var/lib/kubelet /var/lib/etcd /etc/cni/net.d /var/lib/cni /root/.kube ~/.kube /etc/cni/net.d/*
     rm -rf /etc/kubernetes/admin.conf
     rm -rf /root/.kube/config
     rm -rf ~/.kube
