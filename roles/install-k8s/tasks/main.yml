@@ -112,12 +112,18 @@
     flat: yes
   when: node_type == "master" and inventory_hostname == groups['masters'][0]
   
-# - name: Enable and Restart containerd
-#   systemd:
-#     name: containerd
-#     state: restarted
-#     enabled: yes
+- name: Enable and Restart containerd
+  systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
 
+- name: Restart kubelet
+  systemd:
+    name: kubelet
+    state: restarted
+    enabled: yes
+    
 # - name: Stop and disable kubelet
 #   systemd:
 #     name: kubelet
