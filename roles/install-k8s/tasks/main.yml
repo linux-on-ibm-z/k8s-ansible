@@ -12,48 +12,6 @@
   include_role:
     name: disable-swap-selinux
 
-- name: Wait for bastion host to be reachable
-  wait_for:
-    host: "{{ bastion_ip }}"
-    port: 22
-    timeout: 300
-    state: started
-
-- name: Run network, routing, NAT, and hostname checks on bastion
-  hosts: bastion
-  become: yes
-  gather_facts: yes
-  tasks:
-    - name: Show network interfaces
-      command: ip -4 addr show
-
-    - name: Show routing table
-      command: ip route
-
-    - name: Show NAT configuration
-      command: iptables -t nat -L -n -v
-
-    - name: Show IP forwarding status
-      command: sysctl net.ipv4.ip_forward
-
-    - name: Show hostname info
-      command: hostnamectl
-
-    - name: Ensure hostname matches short name only
-      shell: hostnamectl set-hostname $(hostname | cut -d "." -f1)
-
-    - name: Apply security updates (Ubuntu)
-      apt:
-        upgrade: yes
-        update_cache: yes
-      when: ansible_pkg_mgr == 'apt'
-
-    - name: Apply security updates (RHEL/Yum/DNF)
-      yum:
-        name: '*'
-        state: latest
-      when: ansible_pkg_mgr in ['yum', 'dnf']
-
 - name: Prepare all Kubernetes nodes (masters and workers)
   hosts: all
   become: yes
