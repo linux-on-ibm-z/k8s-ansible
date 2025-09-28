@@ -2,158 +2,286 @@
 # network interface on ppc64le-https://jsw.ibm.com/browse/POWERCLOUD-16
 # This workaround fixed above failure.
 # Follow up task to remove this in future https://jsw.ibm.com/browse/POWERCLOUD-34
-# - name: Disable tx-checksumming on default network interface
-#   command: ethtool --offload {{ ansible_default_ipv4['interface'] }} tx-checksumming off
-#   when:
-#     - ansible_default_ipv4['interface'] is defined
-#     - ansible_architecture == 'ppc64le'
+- name: Disable tx-checksumming on default network interface
+  command: ethtool --offload {{ ansible_default_ipv4['interface'] }} tx-checksumming off
+  when:
+    - ansible_default_ipv4['interface'] is defined
+    - ansible_architecture == 'ppc64le'
 
-# - name: Disable SELinux and disable SWAP in fstab
-#   include_role:
-#     name: disable-swap-selinux
+- name: Disable SELinux and disable SWAP in fstab
+  include_role:
+    name: disable-swap-selinux
 
-# # PowerVS has default domainname set as .power-iaas.cloud.ibm.com which is not present in the cloud
-# - name: Remove domain name from the hostname
-#   shell: |
-#     hostnamectl set-hostname $(hostname | cut -d "." -f1)
+- name: Wait for bastion host to be reachable
+  wait_for:
+    host: "{{ bastion_ip }}"
+    port: 22
+    timeout: 300
+    state: started
 
-# - name: Install prereq packages
-#   package:
-#     name:
-#       - conntrack-tools
-#       - socat
-#       - iproute-tc
-#       - iptables
-#     state: present
-#   when: ansible_pkg_mgr in ['yum', 'dnf']
+- name: Run network, routing, NAT, and hostname checks on bastion
+  hosts: bastion
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Show network interfaces
+      command: ip -4 addr show
 
-# - name: Install prereq Ubuntu packages
-#   apt:
-#     name: "{{ packages }}"
-#     state: present
-#   vars:
-#     packages:
-#       - conntrack
-#       - socat
-#       - iproute2
-#       - iptables
-#   when: ansible_pkg_mgr == 'apt'
+    - name: Show routing table
+      command: ip route
 
-# - name: Template a kubelet service to /usr/lib/systemd/system/kubelet.service
-#   template:
-#     src: kubelet.service.j2
-#     dest: /usr/lib/systemd/system/kubelet.service
-#     mode: '0644'
+    - name: Show NAT configuration
+      command: iptables -t nat -L -n -v
 
-# - name: Enable and start kubelet
-#   systemd:
-#     name: kubelet
-#     daemon_reexec: true
-#     state: restarted
-#     enabled: yes
+    - name: Show IP forwarding status
+      command: sysctl net.ipv4.ip_forward
 
-# - name: Generate kubeadm.yaml
-#   template:
-#     src: kubeadm.yaml.j2
-#     dest: /root/kubeadm.yaml
-#     mode: '0644'
+    - name: Show hostname info
+      command: hostnamectl
 
-# - name: Perform kubeadm init on the control plane node based on LB configuration.
-#   command: >
-#     {% if loadbalancer == '' -%}
-#       kubeadm init --config /root/kubeadm.yaml
-#     {%- else -%}
-#       kubeadm init --config /root/kubeadm.yaml --upload-certs
-#     {%- endif %}
-#   when: inventory_hostname == groups['masters'][0]
+    - name: Ensure hostname matches short name only
+      shell: hostnamectl set-hostname $(hostname | cut -d "." -f1)
 
-# - name: generate join command for HA cluster
-#   environment:
-#     KUBECONFIG: /etc/kubernetes/admin.conf
-#   shell: |
-#     cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1)
-#     kubeadm token create --print-join-command --certificate-key $cert_key
-#   changed_when: false
-#   when: groups['masters']|length > 1 and inventory_hostname == groups['masters'][0]
-#   register: kubernetes_cp_join_command_result
+    - name: Apply security updates (Ubuntu)
+      apt:
+        upgrade: yes
+        update_cache: yes
+      when: ansible_pkg_mgr == 'apt'
 
-# - name: Set the kubeadm join command for control plane nodes globally.
-#   set_fact:
-#     kubernetes_cp_join_command: >
-#       {{ kubernetes_cp_join_command_result.stdout }}
-#   when: kubernetes_cp_join_command_result.stdout is defined and groups['masters']|length > 1
-#   delegate_to: "{{ item }}"
-#   delegate_facts: true
-#   with_items: "{{ groups['all'] }}"
+    - name: Apply security updates (RHEL/Yum/DNF)
+      yum:
+        name: '*'
+        state: latest
+      when: ansible_pkg_mgr in ['yum', 'dnf']
 
-# - name: kubeadm join control plane nodes
-#   command: "{{ kubernetes_cp_join_command }}"
-#   when: inventory_hostname != groups['masters'][0] and node_type == "master"
+- name: Prepare all Kubernetes nodes (masters and workers)
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Wait until SSH is available
+      wait_for_connection:
+        timeout: 300
 
-# - name: Create a directory ${HOME}/.kube if it does not exist
-#   file:
-#     path: ${HOME}/.kube/
-#     state: directory
-#     mode: '0755'
-#   when: node_type == "master"
+    - name: Verify network interfaces
+      command: ip -4 addr show
 
-# - name: Copy the /etc/kubernetes/admin.conf to ${HOME}/.kube/config
-#   copy:
-#     src: /etc/kubernetes/admin.conf
-#     dest: ${HOME}/.kube/config
-#     remote_src: yes
-#   when: node_type == "master"
+    - name: Verify routing table
+      command: ip route
 
-# - name: Copy the /etc/kubernetes/admin.conf to local machine(path - {{ kubeconfig_path }})
-#   fetch:
-#     src: /etc/kubernetes/admin.conf
-#     dest: "{{ kubeconfig_path }}"
-#     flat: yes
-#   when: node_type == "master" and inventory_hostname == groups['masters'][0]
+    - name: Verify IP forwarding
+      command: sysctl net.ipv4.ip_forward
 
-- name: Stop and disable kubelet
+    - name: Verify NAT tables
+      command: iptables -t nat -L -n -v
+
+    - name: Ensure hostname matches short name only
+      shell: hostnamectl set-hostname $(hostname | cut -d "." -f1)
+
+    - name: Apply security updates (Ubuntu)
+      apt:
+        upgrade: yes
+        update_cache: yes
+      when: ansible_pkg_mgr == 'apt'
+
+    - name: Apply security updates (RHEL/Yum/DNF)
+      yum:
+        name: '*'
+        state: latest
+      when: ansible_pkg_mgr in ['yum', 'dnf']
+
+    - name: Ensure .kube directory exists on masters
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+      when: node_type == "master"
+      
+- name: Prepare all Kubernetes nodes (masters and workers)
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Wait until SSH is available
+      wait_for_connection:
+        timeout: 300
+
+    - name: Verify network interfaces
+      command: ip -4 addr show
+
+    - name: Verify routing table
+      command: ip route
+
+    - name: Verify IP forwarding
+      command: sysctl net.ipv4.ip_forward
+
+    - name: Verify NAT tables
+      command: iptables -t nat -L -n -v
+
+    - name: Ensure hostname matches short name only
+      shell: hostnamectl set-hostname $(hostname | cut -d "." -f1)
+
+    - name: Apply security updates (Ubuntu)
+      apt:
+        upgrade: yes
+        update_cache: yes
+      when: ansible_pkg_mgr == 'apt'
+
+    - name: Apply security updates (RHEL/Yum/DNF)
+      yum:
+        name: '*'
+        state: latest
+      when: ansible_pkg_mgr in ['yum', 'dnf']
+
+    - name: Ensure .kube directory exists on masters
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+      when: node_type == "master"
+
+# PowerVS has default domainname set as .power-iaas.cloud.ibm.com which is not present in the cloud
+- name: Remove domain name from the hostname
+  shell: |
+    hostnamectl set-hostname $(hostname | cut -d "." -f1)
+
+- name: Install prereq packages
+  package:
+    name:
+      - conntrack-tools
+      - socat
+      - iproute-tc
+      - iptables
+    state: present
+  when: ansible_pkg_mgr in ['yum', 'dnf']
+
+- name: Install prereq Ubuntu packages
+  apt:
+    name: "{{ packages }}"
+    state: present
+  vars:
+    packages:
+      - conntrack
+      - socat
+      - iproute2
+      - iptables
+  when: ansible_pkg_mgr == 'apt'
+
+- name: Template a kubelet service to /usr/lib/systemd/system/kubelet.service
+  template:
+    src: kubelet.service.j2
+    dest: /usr/lib/systemd/system/kubelet.service
+    mode: '0644'
+
+- name: Enable and start kubelet
   systemd:
     name: kubelet
-    state: stopped
-    enabled: no
+    daemon_reexec: true
+    state: restarted
+    enabled: yes
 
-- name: Reset kubeadm on all nodes
-  become: yes
-  ansible.builtin.shell: |
-    pid=$(lsof -ti:10250) 
-    if [ -n "$pid" ]; then 
-      kill -9 $pid
-    fi
-    kubeadm reset -f
-    systemctl stop kubelet
-    systemctl disable kubelet
-    rm -rf /etc/kubernetes/admin.conf /var/lib/kubelet /var/lib/etcd /etc/cni/net.d /var/lib/cni /root/.kube ~/.kube /etc/cni/net.d/*
-    rm -rf /etc/kubernetes/admin.conf
-    rm -rf /root/.kube/config
-    rm -rf ~/.kube
-    rm -rf /etc/cni/net.d/*
+- name: Generate kubeadm.yaml
+  template:
+    src: kubeadm.yaml.j2
+    dest: /root/kubeadm.yaml
+    mode: '0644'
+
+- name: Perform kubeadm init on the control plane node based on LB configuration.
+  command: >
+    {% if loadbalancer == '' -%}
+      kubeadm init --config /root/kubeadm.yaml
+    {%- else -%}
+      kubeadm init --config /root/kubeadm.yaml --upload-certs
+    {%- endif %}
+  when: inventory_hostname == groups['masters'][0]
+
+- name: generate join command for HA cluster
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  shell: |
+    cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -1)
+    kubeadm token create --print-join-command --certificate-key $cert_key
+  changed_when: false
+  when: groups['masters']|length > 1 and inventory_hostname == groups['masters'][0]
+  register: kubernetes_cp_join_command_result
+
+- name: Set the kubeadm join command for control plane nodes globally.
+  set_fact:
+    kubernetes_cp_join_command: >
+      {{ kubernetes_cp_join_command_result.stdout }}
+  when: kubernetes_cp_join_command_result.stdout is defined and groups['masters']|length > 1
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  with_items: "{{ groups['all'] }}"
+
+- name: kubeadm join control plane nodes
+  command: "{{ kubernetes_cp_join_command }}"
+  when: inventory_hostname != groups['masters'][0] and node_type == "master"
+
+- name: Create a directory ${HOME}/.kube if it does not exist
+  file:
+    path: ${HOME}/.kube/
+    state: directory
+    mode: '0755'
+  when: node_type == "master"
+
+- name: Copy the /etc/kubernetes/admin.conf to ${HOME}/.kube/config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: ${HOME}/.kube/config
+    remote_src: yes
+  when: node_type == "master"
+
+- name: Copy the /etc/kubernetes/admin.conf to local machine(path - {{ kubeconfig_path }})
+  fetch:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ kubeconfig_path }}"
+    flat: yes
+  when: node_type == "master" and inventory_hostname == groups['masters'][0]
+
+# - name: Stop and disable kubelet
+#   systemd:
+#     name: kubelet
+#     state: stopped
+#     enabled: no
+
+# - name: Reset kubeadm on all nodes
+#   become: yes
+#   ansible.builtin.shell: |
+#     pid=$(lsof -ti:10250) 
+#     if [ -n "$pid" ]; then 
+#       kill -9 $pid
+#     fi
+#     kubeadm reset -f
+#     systemctl stop kubelet
+#     systemctl disable kubelet
+#     rm -rf /etc/kubernetes/admin.conf /var/lib/kubelet /var/lib/etcd /etc/cni/net.d /var/lib/cni /root/.kube ~/.kube /etc/cni/net.d/*
+#     rm -rf /etc/kubernetes/admin.conf
+#     rm -rf /root/.kube/config
+#     rm -rf ~/.kube
+#     rm -rf /etc/cni/net.d/*
   
-# - name: remove taint
-#   command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane-; kubectl taint nodes --all node-role.kubernetes.io/master-"
-#   environment:
-#     KUBECONFIG: /etc/kubernetes/admin.conf
-#   when: node_type == "master" and not ('workers' in groups and groups['workers'])
+- name: remove taint
+  command: "kubectl taint nodes --all node-role.kubernetes.io/control-plane-; kubectl taint nodes --all node-role.kubernetes.io/master-"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: node_type == "master" and not ('workers' in groups and groups['workers'])
 
-# - name: Get the kubeadm join command from the Kubernetes master.
-#   command: kubeadm token create --print-join-command
-#   changed_when: false
-#   when: node_type == "master"
-#   register: kubernetes_join_command_result
+- name: Get the kubeadm join command from the Kubernetes master.
+  command: kubeadm token create --print-join-command
+  changed_when: false
+  when: node_type == "master"
+  register: kubernetes_join_command_result
 
-# - name: Set the kubeadm join command globally.
-#   set_fact:
-#     kubernetes_join_command: >
-#       {{ kubernetes_join_command_result.stdout }}
-#   when: kubernetes_join_command_result.stdout is defined
-#   delegate_to: "{{ item }}"
-#   delegate_facts: true
-#   with_items: "{{ groups['all'] }}"
+- name: Set the kubeadm join command globally.
+  set_fact:
+    kubernetes_join_command: >
+      {{ kubernetes_join_command_result.stdout }}
+  when: kubernetes_join_command_result.stdout is defined
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  with_items: "{{ groups['all'] }}"
 
-# - name: kubeadm join worker nodes
-#   command: "{{ kubernetes_join_command }}"
-#   when: node_type == "worker"
+- name: kubeadm join worker nodes
+  command: "{{ kubernetes_join_command }}"
+  when: node_type == "worker"
